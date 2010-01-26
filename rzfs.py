@@ -24,7 +24,11 @@ import uuid
 import json
 
 urls = ('/zfs/(.*)', 'zfsDB',
-        '/iscsit/(.*)', 'iscsitDB'
+        '/iscsitadm/tpgt/(.*)', 'iscsitDBtpgt',
+        '/iscsitadm/target/(.*)', 'iscsitDBtarget',
+        '/iscsitadm/initiator/(.*)', 'iscsitDBinitiator',
+        '/iscsitadm/admin/(.*)', 'iscsitDBadmin',
+        '/iscsitadm/stats/(.*)', 'iscsitDBstats'
 )
 
 class AbstractDB(object):
@@ -35,14 +39,86 @@ class AbstractDB(object):
         except:
             return None
 
-class iscsitDB(AbstractDB):
-    """Accesses iscsitadm"""
+class iscsitDBstats(AbstractDB):
+    """Accesses iscsitadm stats"""
+
+    def get_key(self, key):
+        try:
+            if key:
+                sp=subprocess.Popen(("/usr/sbin/iscsitadm","show","stats",key),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            else:
+                sp=subprocess.Popen(("/usr/sbin/iscsitadm","show","stats"),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            soo=sp.communicate()
+            di=dict()
+            soo0=soo[0].splitlines()
+            for line in soo0[3:]:
+                kval=line.split()
+                name=kval[0]
+                di[name]=dict()
+                di[name]['ro']=kval[1]
+                di[name]['wo']=kval[2]
+                di[name]['rb']=kval[3]
+                di[name]['wb']=kval[4]
+            return di
+        except Exception as (errno):
+            return "Error on key ({0}) - ({1})".format(key, errno)
+        
+
+class iscsitDBadmin(AbstractDB):
+    """Accesses iscsitadm admin"""
+
+    def get_key(self, key):
+        try:
+            sp=subprocess.Popen(("/usr/sbin/iscsitadm","show","admin"),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            soo=sp.communicate()
+            di=dict()
+            for line in soo[0].splitlines():
+                kval=line.strip(" ").split(":",1)
+                di[kval[0]]=kval[1].strip(" ")
+            return di
+        except Exception as (errno):
+            return "Error on key ({0}) - ({1})".format(key, errno)
+        
+
+class iscsitDBinitiator(AbstractDB):
+    """Accesses iscsitadm initiator"""
+
+    def get_key(self, key):
+        try:
+            sp=subprocess.Popen(("/usr/sbin/iscsitadm","list","initiator","-v",key),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            soo=sp.communicate()
+            di=dict()
+            for line in soo[0].splitlines():
+                kval=line.strip(" ").split(":",1)
+                di[kval[0]]=kval[1].strip(" ")
+            return di
+        except Exception as (errno):
+            return "Error on key ({0}) - ({1})".format(key, errno)
+        
+
+class iscsitDBtpgt(AbstractDB):
+    """Accesses iscsitadm tpgt"""
+
+    def get_key(self, key):
+        try:
+            sp=subprocess.Popen(("/usr/sbin/iscsitadm","list","tpgt","-v",key),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            soo=sp.communicate()
+            di=dict()
+            for line in soo[0].splitlines():
+                kval=line.strip(" ").split(":",1)
+                di[kval[0]]=kval[1].strip(" ")
+            return di
+        except Exception as (errno):
+            return "Error on key ({0}) - ({1})".format(key, errno)
+        
+
+class iscsitDBtarget(AbstractDB):
+    """Accesses iscsitadm target"""
 
     def get_key(self, key):
         try:
             sp=subprocess.Popen(("/usr/sbin/iscsitadm","list","target","-v",key),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             soo=sp.communicate()
-            #return soo[0].rstrip("\n").split("\t")
             di=dict()
             for line in soo[0].splitlines():
                 kval=line.strip(" ").split(":",1)
@@ -56,9 +132,22 @@ class zfsDB(AbstractDB):
 
     def get_key(self, key):
         try:
-            sp=subprocess.Popen(("/usr/sbin/zfs","list","-H",key),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if key:
+                sp=subprocess.Popen(("/usr/sbin/zfs","list","-H",key),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            else:
+                sp=subprocess.Popen(("/usr/sbin/zfs","list","-H"),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             soo=sp.communicate()
-            return soo[0].rstrip("\n").split("\t")
+            di=dict()
+            soo0=soo[0].splitlines()
+            for line in soo0:
+                kval=line.split()
+                name=kval[0]
+                di[name]=dict()
+                di[name]['used']=kval[1]
+                di[name]['avail']=kval[2]
+                di[name]['refer']=kval[3]
+                di[name]['mntpnt']=kval[4]
+            return di
         except Exception as (errno):
             return "Error on key ({0}) - ({1})".format(key, errno)
         
