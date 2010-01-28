@@ -39,6 +39,12 @@ class AbstractDB(object):
         except:
             return None
 
+    def POST(self, name):
+        try:
+            return json.dumps(self.put_key(str(name)))
+        except:
+            return None
+
 class iscsitDBstats(AbstractDB):
     """Accesses iscsitadm stats"""
 
@@ -55,10 +61,14 @@ class iscsitDBstats(AbstractDB):
                 kval=line.split()
                 name=kval[0]
                 di[name]=dict()
-                di[name]['ro']=kval[1]
-                di[name]['wo']=kval[2]
-                di[name]['rb']=kval[3]
-                di[name]['wb']=kval[4]
+                # read iops
+                di[name]['read-ops']=kval[1]
+                # write iops
+                di[name]['write-ops']=kval[2]
+                # read bw
+                di[name]['read-bw']=kval[3]
+                # write bw
+                di[name]['write-bw']=kval[4]
             return di
         except Exception as (errno):
             return "Error on key ({0}) - ({1})".format(key, errno)
@@ -119,11 +129,13 @@ class iscsitDBtarget(AbstractDB):
         try:
             sp=subprocess.Popen(("/usr/sbin/iscsitadm","list","target","-v",key),stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             soo=sp.communicate()
+            ret=dict()
             di=dict()
             for line in soo[0].splitlines():
                 kval=line.strip(" ").split(":",1)
                 di[kval[0]]=kval[1].strip(" ")
-            return di
+            ret[di['Target']]=di
+            return ret
         except Exception as (errno):
             return "Error on key ({0}) - ({1})".format(key, errno)
         
@@ -150,6 +162,29 @@ class zfsDB(AbstractDB):
             return di
         except Exception as (errno):
             return "Error on key ({0}) - ({1})".format(key, errno)
-        
+
+
+    def put_key(self,volname):
+        try:
+            zdata=json.loads(web.data())
+            if not volname:
+                if zdata['volname']:
+                    volname=zdata['volname']
+                else:
+                    return web.internalerror("volname not specified.")
+
+            if volname and zdata['volsize']:
+                cmd=("/usr/bin/pfexec","/usr/sbin/zfs","create","-V",zdata['volsize'],volname)
+                sp=subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                soo=sp.communicate()
+                return soo[0]
+            else:
+                return web.internalerror("volsize not specified.")
+            return 999
+
+        except Exception as (errno):
+            return "Error on key ({0}) - ({1})".format(volname, errno)
+
+
 if __name__ == "__main__":
-    web.application(urls, globals()).run()
+    app=web.application(urls, globals()).run()
