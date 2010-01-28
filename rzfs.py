@@ -180,7 +180,6 @@ class zfsDB(AbstractDB):
                 return soo[0]
             else:
                 return web.internalerror("volsize not specified.")
-            return 999
 
         except Exception as (errno):
             return "Error on key ({0}) - ({1})".format(volname, errno)
