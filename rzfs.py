@@ -17,11 +17,13 @@
 
 import subprocess
 
+import sys
 import web
 import re
 import uuid
 
 import json
+import pickle
 
 urls = ('/zfs/(.*)', 'zfsDB',
         '/iscsitadm/tpgt/(.*)', 'iscsitDBtpgt',
@@ -35,12 +37,14 @@ class AbstractDB(object):
     """Abstract database that handles the high-level HTTP primitives."""
     def GET(self, name):
         try:
+            #return pickle.dumps(self.get_key(str(name)))
             return json.dumps(self.get_key(str(name)))
         except:
             return None
 
     def POST(self, name):
         try:
+            #return pickle.dumps(self.put_key(str(name)))
             return json.dumps(self.put_key(str(name)))
         except:
             return None
@@ -133,12 +137,13 @@ class iscsitDBtarget(AbstractDB):
             di=dict()
             for line in soo[0].splitlines():
                 kval=line.strip(" ").split(":",1)
-                di[kval[0]]=kval[1].strip(" ")
+                if not di.has_key(kval[0]):
+                    di[kval[0]]=kval[1].strip(" ")
             ret[di['Target']]=di
             return ret
         except Exception as (errno):
             return "Error on key ({0}) - ({1})".format(key, errno)
-        
+       
 class zfsDB(AbstractDB):
     """Accesses zfs"""
 
@@ -171,6 +176,7 @@ class zfsDB(AbstractDB):
                 if zdata['volname']:
                     volname=zdata['volname']
                 else:
+                    print >>sys.stderr, "volname not specified."
                     return web.internalerror("volname not specified.")
 
             if volname and zdata['volsize']:
@@ -179,9 +185,11 @@ class zfsDB(AbstractDB):
                 soo=sp.communicate()
                 return soo[0]
             else:
+                print >>sys.stderr, "volsize not specified."
                 return web.internalerror("volsize not specified.")
 
         except Exception as (errno):
+            print >>sys.stderr, "ERROR"
             return "Error on key ({0}) - ({1})".format(volname, errno)
 
 
